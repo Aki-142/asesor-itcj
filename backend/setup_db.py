@@ -233,7 +233,7 @@ def create_db():
 
     c.execute(
         "INSERT INTO estudiantes VALUES (?,?,?,?,?,?)",
-        ("22111326", "Noe", "Alvarez", hash_pin("5545"), 5, "IA")
+        ("22111326", "Alejandro", "Ortiz", hash_pin("5545"), 5, "IA")
     )
     califs_data.extend(noe_califs)
 
