@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recomendación de Especialidad | Asesor IA ITCJ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9fafb; }
+        .itcj-red { color: #d32f2f; }
+        .bg-itcj-red { background-color: #d32f2f; }
+        .specialty-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+        .skill-bar { height: 8px; border-radius: 4px; background: #e5e7eb; overflow: hidden; }
+        .skill-progress { height: 100%; background: #d32f2f; transition: width 1.5s ease-out; width: 0%; }
+        @keyframes float { 0%{transform:translateY(0px)} 50%{transform:translateY(-10px)} 100%{transform:translateY(0px)} }
+        .floating-icon { animation: float 3s ease-in-out infinite; }
+        .spinner { border:3px solid #f3f3f3; border-top:3px solid #d32f2f; border-radius:50%; width:24px; height:24px; animation:spin 0.8s linear infinite; display:inline-block; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        /* Barra de probabilidad tricolor */
+        .prob-bar { height: 10px; border-radius: 999px; overflow: hidden; display: flex; }
+        .prob-ia    { background: #d32f2f; }
+        .prob-ciber { background: #1d4ed8; }
+        .prob-gen   { background: #6b7280; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header class="bg-white border-b-4 border-red-700 px-[5%] py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <img src="Liebre.png" alt="Logo ITCJ" class="h-10" onerror="this.src='https://placehold.co/40x40/d32f2f/ffffff?text=L'">
+            <span class="font-bold text-lg hidden sm:block italic">Perfil de Especialidad</span>
+        </div>
+        <div class="flex gap-4">
+            <a href="Principal.html" class="text-gray-600 hover:text-red-700 font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-house"></i> Inicio
+            </a>
+            <a href="index.html" class="text-red-700 hover:bg-red-50 px-3 py-1 rounded-lg font-semibold" onclick="sessionStorage.clear()">
+                Salir
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
+
+        <!-- Mensaje IA -->
+        <div class="flex gap-4 items-start mb-10">
+            <div class="w-12 h-12 bg-itcj-red rounded-full flex items-center justify-center text-white shrink-0 shadow-lg floating-icon">
+                <i class="fa-solid fa-brain text-xl"></i>
+            </div>
+            <div class="bg-white p-6 rounded-2xl rounded-tl-none border border-gray-200 shadow-sm max-w-3xl">
+                <h2 class="font-bold text-gray-800 text-lg mb-2" id="msgTitulo">
+                    <span class="spinner"></span> Analizando perfil académico...
+                </h2>
+                <p class="text-gray-600 text-sm leading-relaxed hidden" id="msgCuerpo"></p>
+                <div class="mt-4 p-3 bg-red-50 rounded-lg border-l-4 border-red-700 hidden" id="msgConclusion">
+                    <p class="text-red-700 font-bold text-sm" id="msgConclusionTexto"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+
+            <!-- Barras de habilidad -->
+            <section class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <h3 class="font-bold text-gray-700 mb-6 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-simple text-blue-500"></i> Tus materias más fuertes
+                </h3>
+                <div id="listaHabilidades" class="space-y-6">
+                    <div class="text-gray-400 text-sm italic">Cargando...</div>
+                </div>
+            </section>
+
+            <!-- Especialidad recomendada -->
+            <section class="specialty-card p-8 rounded-2xl relative overflow-hidden flex flex-col justify-center" id="cardEspecialidad">
+                <div class="relative z-10">
+                    <span class="bg-red-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Opción Sugerida</span>
+                    <h2 class="text-3xl font-black mt-4 mb-2" id="espNombre">...</h2>
+                    <p class="text-slate-300 text-sm italic" id="espDescripcion">...</p>
+                    <ul id="espMaterias" class="mt-6 space-y-3 text-sm text-slate-200"></ul>
+                </div>
+                <i id="espIcono" class="fa-solid fa-microchip absolute -bottom-10 -right-10 text-9xl opacity-10"></i>
+            </section>
+        </div>
+
+        <!-- Probabilidades del modelo -->
+        <div class="mt-10 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-percent text-purple-500"></i> Probabilidades del Modelo IA
+            </h3>
+            <div id="probContainer" class="space-y-4">
+                <div class="text-gray-400 text-sm italic">Calculando...</div>
+            </div>
+            <p class="text-xs text-gray-400 mt-4 italic">
+                Basado en regresión logística entrenada con patrones de desempeño académico de 26 estudiantes.
+            </p>
+        </div>
+
+        <!-- CTA -->
+        <div class="mt-10 bg-white p-8 rounded-2xl border-2 border-dashed border-gray-200 text-center">
+            <h4 class="font-bold text-xl text-gray-800 mb-2">¿Estás listo para el futuro?</h4>
+            <p class="text-gray-500 mb-6">Puedes revisar el mapa curricular de tu especialidad sugerida o contactar al coordinador de carrera.</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="MateriaReco.html" class="bg-itcj-red text-white px-8 py-3 rounded-xl font-bold hover:bg-red-800 transition-all shadow-lg">
+                    Ver Materias de Especialidad
+                </a>
+                <button class="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-900 transition-all shadow-lg">
+                    Contactar Coordinador
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center p-6 text-gray-400 text-xs mt-auto">
+        Instituto Tecnológico de Ciudad Juárez | División de Estudios Profesionales <br>
+        Algoritmo de Perfilamiento Académico v2.4 (Regresión Logística)
+    </footer>
+
+    <script>
+        const API_BASE   = "http://localhost:5000/api";
+        const estudiante = JSON.parse(sessionStorage.getItem("estudiante") || "null");
+        if (!estudiante) { window.location.href = "index.html"; }
+
+        const ICON_MAP = {
+            "fa-brain":        "fa-brain",
+            "fa-shield-halved":"fa-shield-halved",
+            "fa-laptop-code":  "fa-laptop-code",
+        };
+
+        async function cargarEspecialidad() {
+            try {
+                const res  = await fetch(`${API_BASE}/especialidad/${estudiante.matricula}`);
+                const data = await res.json();
+
+                // Mensaje
+                document.getElementById("msgTitulo").textContent = "¡Análisis de Perfil Completado!";
+                const topNombres = data.top_materias.slice(0, 3).map(m => `<em>${m.nombre}</em>`).join(", ");
+                document.getElementById("msgCuerpo").innerHTML =
+                    `Hola, <strong>${data.estudiante.nombre}</strong>. He analizado tu historial en el SII. ` +
+                    `Tus materias más destacadas son: ${topNombres}, con promedios sobresalientes en esa área.`;
+                document.getElementById("msgCuerpo").classList.remove("hidden");
+
+                const concluEl = document.getElementById("msgConclusion");
+                const concluTx = document.getElementById("msgConclusionTexto");
+                concluTx.innerHTML = `<i class="fa-solid fa-star"></i> Conclusión: Con un ${data.confianza}% de confianza, tu perfil se orienta hacia <strong>${data.especialidad}</strong>.`;
+                concluEl.classList.remove("hidden");
+
+                // Especialidad card
+                document.getElementById("espNombre").textContent    = data.especialidad;
+                document.getElementById("espDescripcion").textContent = data.descripcion;
+                const iconEl = document.getElementById("espIcono");
+                iconEl.className = `fa-solid ${data.icono} absolute -bottom-10 -right-10 text-9xl opacity-10`;
+
+                document.getElementById("espMaterias").innerHTML = data.materias_esp.map(m =>
+                    `<li class="flex items-center gap-2"><i class="fa-solid fa-check text-green-400"></i> ${m}</li>`
+                ).join("");
+
+                // Barras de habilidades (top 5 materias)
+                const habEl = document.getElementById("listaHabilidades");
+                habEl.innerHTML = data.top_materias.map(m => `
+                    <div>
+                        <div class="flex justify-between text-xs font-bold mb-1 uppercase tracking-wider text-gray-500">
+                            <span>${m.nombre}</span>
+                            <span>${m.calificacion}</span>
+                        </div>
+                        <div class="skill-bar">
+                            <div class="skill-progress" data-width="${m.calificacion}"></div>
+                        </div>
+                    </div>
+                `).join("");
+
+                // Animar barras después de render
+                setTimeout(() => {
+                    document.querySelectorAll(".skill-progress").forEach(el => {
+                        el.style.width = el.dataset.width + "%";
+                    });
+                }, 100);
+
+                // Probabilidades
+                const probs   = data.probabilidades;
+                const probEl  = document.getElementById("probContainer");
+                const colores = {
+                    "Ciencia de Datos e IA":   { bar: "bg-red-600",  text: "text-red-700" },
+                    "Ciberseguridad Aplicada":  { bar: "bg-blue-600", text: "text-blue-700" },
+                    "Perfil General":           { bar: "bg-gray-400", text: "text-gray-600" },
+                };
+                probEl.innerHTML = Object.entries(probs).map(([nombre, pct]) => {
+                    const col = colores[nombre] || { bar: "bg-gray-400", text: "text-gray-600" };
+                    return `
+                    <div>
+                        <div class="flex justify-between text-sm font-semibold mb-1">
+                            <span>${nombre}</span>
+                            <span class="${col.text}">${pct}%</span>
+                        </div>
+                        <div class="skill-bar">
+                            <div class="skill-progress ${col.bar}" data-width="${pct}"></div>
+                        </div>
+                    </div>`;
+                }).join("");
+
+                setTimeout(() => {
+                    document.querySelectorAll(".skill-progress").forEach(el => {
+                        el.style.width = el.dataset.width + "%";
+                    });
+                }, 200);
+
+            } catch (e) {
+                document.getElementById("msgTitulo").textContent = "Error al conectar con el servidor.";
+                console.error(e);
+            }
+        }
+
+        cargarEspecialidad();
+    </script>
+</body>
+</html>

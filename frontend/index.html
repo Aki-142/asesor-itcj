@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Asesor IA ITCJ</title>
+    <style>
+        :root {
+            --itcj-red: #d32f2f;
+            --itcj-dark: #1a1a1a;
+            --itcj-white: #ffffff;
+            --itcj-gray: #f4f4f4;
+            --error-red: #ffcdd2;
+            --error-text: #b71c1c;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--itcj-gray);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-container {
+            background-color: var(--itcj-white);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .logo-container img { width: 150px; height: auto; margin-bottom: 1.5rem; }
+        h2 { color: var(--itcj-dark); margin-bottom: 0.5rem; font-weight: 600; }
+        p  { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+        .input-group { text-align: left; margin-bottom: 1.2rem; }
+        .input-group label { display: block; margin-bottom: 0.5rem; color: var(--itcj-dark); font-weight: 500; font-size: 0.85rem; }
+        .input-group input {
+            width: 100%; padding: 0.8rem; border: 1.5px solid #ddd;
+            border-radius: 6px; box-sizing: border-box; transition: border-color 0.3s;
+        }
+        .input-group input:focus { outline: none; border-color: var(--itcj-red); }
+        .error-message {
+            display: none; background-color: var(--error-red); color: var(--error-text);
+            padding: 10px; border-radius: 6px; font-size: 0.85rem;
+            margin-bottom: 1rem; border: 1px solid var(--error-text);
+        }
+        .btn-login {
+            width: 100%; padding: 0.9rem; background-color: var(--itcj-red);
+            color: white; border: none; border-radius: 6px; font-size: 1rem;
+            font-weight: bold; cursor: pointer; transition: background-color 0.3s; margin-top: 1rem;
+        }
+        .btn-login:hover { background-color: #b71c1c; }
+        .btn-login:disabled { background-color: #aaa; cursor: not-allowed; }
+        .footer-text { margin-top: 1.5rem; font-size: 0.75rem; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-container">
+            <img src="Liebre.png" alt="Logo ITCJ" onerror="this.src='https://placehold.co/150x80/d32f2f/ffffff?text=ITCJ'">
+        </div>
+        <h2>Asesor ITCJ</h2>
+        <p>Inicia sesión con tus datos del SII</p>
+        <div id="errorBox" class="error-message"></div>
+        <div class="input-group">
+            <label for="control">Número de Control</label>
+            <input type="text" id="control" placeholder="Matrícula" required>
+        </div>
+        <div class="input-group">
+            <label for="nip">NIP</label>
+            <input type="password" id="nip" placeholder="NIP de 4 dígitos" maxlength="4" required>
+        </div>
+        <button class="btn-login" id="btnLogin" onclick="doLogin()">Ingresar</button>
+        <div class="footer-text">
+            Instituto Tecnológico de Ciudad Juárez <br>
+            "Forjando el Futuro: Transformando Vidas"
+        </div>
+    </div>
+
+    <script>
+        // ── Cambiar esta URL cuando se despliegue en Render ─────────────────
+        const API_BASE = "http://localhost:5000/api";
+
+        async function doLogin() {
+            const matricula = document.getElementById('control').value.trim();
+            const pin       = document.getElementById('nip').value.trim();
+            const errorBox  = document.getElementById('errorBox');
+            const btn       = document.getElementById('btnLogin');
+
+            errorBox.style.display = 'none';
+            if (!matricula || !pin) {
+                showError("Por favor ingresa tu matrícula y NIP.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = "Verificando...";
+
+            try {
+                const res  = await fetch(`${API_BASE}/login`, {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({ matricula, pin }),
+                });
+                const data = await res.json();
+
+                if (data.ok) {
+                    // Guardar datos del estudiante en sessionStorage
+                    sessionStorage.setItem("estudiante", JSON.stringify(data.estudiante));
+                    window.location.href = "Principal.html";
+                } else {
+                    showError(data.msg || "Matrícula o NIP incorrectos.");
+                    document.getElementById('nip').value = '';
+                }
+            } catch (e) {
+                showError("No se pudo conectar con el servidor. Verifica que el backend esté corriendo.");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Ingresar";
+            }
+        }
+
+        function showError(msg) {
+            const box = document.getElementById('errorBox');
+            box.textContent = msg;
+            box.style.display = 'block';
+        }
+
+        // Permitir Enter
+        document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    </script>
+</body>
+</html>
