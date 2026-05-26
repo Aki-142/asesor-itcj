@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import pickle
 import hashlib
 import numpy as np
@@ -9,26 +10,25 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-DB_PATH    = os.path.join(BASE_DIR, "asesor.db")
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "modelo_especialidad.pkl")
+DB_URL     = os.environ.get("DATABASE_URL")
 
 # ── Carga el modelo una vez al iniciar ───────────────────────────────────────
 with open(MODEL_PATH, "rb") as f:
     BUNDLE = pickle.load(f)
 
-MODEL         = BUNDLE["model"]
-SCALER        = BUNDLE["scaler"]
+MODEL          = BUNDLE["model"]
+SCALER         = BUNDLE["scaler"]
 MATERIAS_CLAVE = BUNDLE["materias_clave"]
-LABEL_INV     = BUNDLE["label_inv"]
+LABEL_INV      = BUNDLE["label_inv"]
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DB_URL)
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
-
 
 def hash_pin(pin: str) -> str:
     return hashlib.sha256(pin.encode()).hexdigest()
@@ -37,7 +37,7 @@ def hash_pin(pin: str) -> str:
 # ── ENDPOINT: Login ──────────────────────────────────────────────────────────
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.get_json()
+    data      = request.get_json()
     matricula = data.get("matricula", "").strip()
     pin       = data.get("pin", "").strip()
 
@@ -45,10 +45,12 @@ def login():
         return jsonify({"ok": False, "msg": "Datos incompletos"}), 400
 
     conn = get_db()
-    row = conn.execute(
-        "SELECT matricula, nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=? AND pin_hash=?",
+    cur  = conn.cursor()
+    cur.execute(
+        "SELECT matricula, nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=%s AND pin_hash=%s",
         (matricula, hash_pin(pin))
-    ).fetchone()
+    )
+    row = cur.fetchone()
     conn.close()
 
     if not row:
@@ -57,10 +59,10 @@ def login():
     return jsonify({
         "ok": True,
         "estudiante": {
-            "matricula":        row["matricula"],
-            "nombre":           row["nombre"],
-            "apellido":         row["apellido"],
-            "semestre_actual":  row["semestre_actual"],
+            "matricula":       row["matricula"],
+            "nombre":          row["nombre"],
+            "apellido":        row["apellido"],
+            "semestre_actual": row["semestre_actual"],
         }
     })
 
@@ -69,29 +71,32 @@ def login():
 @app.route("/api/rendimiento/<matricula>")
 def rendimiento(matricula):
     conn = get_db()
+    cur  = conn.cursor()
 
-    est = conn.execute(
-        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=?",
+    cur.execute(
+        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=%s",
         (matricula,)
-    ).fetchone()
+    )
+    est = cur.fetchone()
     if not est:
         conn.close()
         return jsonify({"error": "Estudiante no encontrado"}), 404
 
-    califs = conn.execute("""
+    cur.execute("""
         SELECT m.clave, m.nombre, m.semestre, m.creditos, m.afinidad, c.calificacion
         FROM calificaciones c
         JOIN materias m ON c.clave = m.clave
-        WHERE c.matricula = ?
+        WHERE c.matricula = %s
         ORDER BY m.semestre, m.nombre
-    """, (matricula,)).fetchall()
+    """, (matricula,))
+    califs = cur.fetchall()
     conn.close()
 
-    total_cal   = [r["calificacion"] for r in califs if r["semestre"] < est["semestre_actual"]]
-    promedio    = round(sum(total_cal) / len(total_cal), 2) if total_cal else 0
-
     semestre_actual = est["semestre_actual"]
-    actuales = [r for r in califs if r["semestre"] == semestre_actual]
+    total_cal = [r["calificacion"] for r in califs if r["semestre"] < semestre_actual]
+    promedio  = round(sum(total_cal) / len(total_cal), 2) if total_cal else 0
+
+    actuales  = [r for r in califs if r["semestre"] == semestre_actual]
     en_riesgo = [
         {
             "clave":        r["clave"],
@@ -109,7 +114,7 @@ def rendimiento(matricula):
 
     historial_por_semestre = {}
     for r in califs:
-        s = r["semestre"]
+        s = str(r["semestre"])
         if s not in historial_por_semestre:
             historial_por_semestre[s] = []
         historial_por_semestre[s].append({
@@ -119,13 +124,13 @@ def rendimiento(matricula):
         })
 
     return jsonify({
-        "estudiante":           {"nombre": est["nombre"], "apellido": est["apellido"]},
-        "promedio_general":     promedio,
-        "semestre_actual":      semestre_actual,
-        "creditos_acumulados":  creditos_acumulados,
-        "creditos_totales":     260,
-        "materias_en_riesgo":   en_riesgo,
-        "historial":            historial_por_semestre,
+        "estudiante":          {"nombre": est["nombre"], "apellido": est["apellido"]},
+        "promedio_general":    promedio,
+        "semestre_actual":     semestre_actual,
+        "creditos_acumulados": creditos_acumulados,
+        "creditos_totales":    260,
+        "materias_en_riesgo":  en_riesgo,
+        "historial":           historial_por_semestre,
     })
 
 
@@ -133,53 +138,50 @@ def rendimiento(matricula):
 @app.route("/api/materias-recomendadas/<matricula>")
 def materias_recomendadas(matricula):
     conn = get_db()
+    cur  = conn.cursor()
 
-    est = conn.execute(
-        "SELECT semestre_actual FROM estudiantes WHERE matricula=?",
+    cur.execute(
+        "SELECT semestre_actual FROM estudiantes WHERE matricula=%s",
         (matricula,)
-    ).fetchone()
+    )
+    est = cur.fetchone()
     if not est:
         conn.close()
         return jsonify({"error": "Estudiante no encontrado"}), 404
 
     semestre_siguiente = est["semestre_actual"] + 1
 
-    # Materias que el alumno ya aprobó (cal >= 70)
-    aprobadas = set(
-        r["clave"] for r in conn.execute(
-            "SELECT clave FROM calificaciones WHERE matricula=? AND calificacion >= 70",
-            (matricula,)
-        ).fetchall()
+    cur.execute(
+        "SELECT clave FROM calificaciones WHERE matricula=%s AND calificacion >= 70",
+        (matricula,)
     )
+    aprobadas = set(r["clave"] for r in cur.fetchall())
 
-    # Todas las materias del siguiente semestre
-    candidatas = conn.execute(
-        "SELECT * FROM materias WHERE semestre=?",
+    cur.execute(
+        "SELECT * FROM materias WHERE semestre=%s",
         (semestre_siguiente,)
-    ).fetchall()
+    )
+    candidatas = cur.fetchall()
 
-    # Verificar seriaciones
     recomendadas = []
     for mat in candidatas:
-        prereqs = conn.execute(
-            "SELECT prereq FROM seriaciones WHERE desbloquea=?",
+        cur.execute(
+            "SELECT prereq FROM seriaciones WHERE desbloquea=%s",
             (mat["clave"],)
-        ).fetchall()
-
-        prereq_claves = [r["prereq"] for r in prereqs]
+        )
+        prereq_claves = [r["prereq"] for r in cur.fetchall()]
         cumple = all(p in aprobadas for p in prereq_claves)
 
         recomendadas.append({
-            "clave":       mat["clave"],
-            "nombre":      mat["nombre"],
-            "creditos":    mat["creditos"],
-            "afinidad":    mat["afinidad"],
-            "prereqs":     prereq_claves,
-            "disponible":  cumple,
+            "clave":      mat["clave"],
+            "nombre":     mat["nombre"],
+            "creditos":   mat["creditos"],
+            "afinidad":   mat["afinidad"],
+            "prereqs":    prereq_claves,
+            "disponible": cumple,
         })
 
     conn.close()
-
     total_creditos = sum(r["creditos"] for r in recomendadas if r["disponible"])
 
     return jsonify({
@@ -189,29 +191,31 @@ def materias_recomendadas(matricula):
     })
 
 
-# ── ENDPOINT: Recomendación de especialidad (IA) ────────────────────────────
+# ── ENDPOINT: Recomendación de especialidad ─────────────────────────────────
 @app.route("/api/especialidad/<matricula>")
 def especialidad(matricula):
     conn = get_db()
+    cur  = conn.cursor()
 
-    est = conn.execute(
-        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=?",
+    cur.execute(
+        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=%s",
         (matricula,)
-    ).fetchone()
+    )
+    est = cur.fetchone()
     if not est:
         conn.close()
         return jsonify({"error": "Estudiante no encontrado"}), 404
 
-    # Vector de características
-    vector = []
+    vector          = []
     materias_detalle = []
     for clave in MATERIAS_CLAVE:
-        row = conn.execute(
-            "SELECT c.calificacion, m.nombre, m.afinidad FROM calificaciones c "
-            "JOIN materias m ON c.clave=m.clave "
-            "WHERE c.matricula=? AND c.clave=?",
-            (matricula, clave)
-        ).fetchone()
+        cur.execute("""
+            SELECT c.calificacion, m.nombre, m.afinidad
+            FROM calificaciones c
+            JOIN materias m ON c.clave = m.clave
+            WHERE c.matricula=%s AND c.clave=%s
+        """, (matricula, clave))
+        row = cur.fetchone()
         cal = row["calificacion"] if row else 70.0
         vector.append(cal)
         if row:
@@ -223,9 +227,8 @@ def especialidad(matricula):
 
     conn.close()
 
-    X = np.array(vector).reshape(1, -1)
+    X        = np.array(vector).reshape(1, -1)
     X_scaled = SCALER.transform(X)
-
     probs    = MODEL.predict_proba(X_scaled)[0]
     pred_idx = int(np.argmax(probs))
 
@@ -234,8 +237,9 @@ def especialidad(matricula):
             "nombre":      "Ciencia de Datos e IA",
             "descripcion": "Enfocada en Machine Learning, Redes Neuronales y Ciencia de Datos.",
             "icono":       "fa-brain",
-            "materias":    ["Machine Learning", "Redes Neuronales Artificiales", "Mineria de Datos",
-                            "Vision por Computadora", "Procesamiento de Lenguaje Natural"],
+            "materias":    ["Machine Learning", "Redes Neuronales Artificiales",
+                            "Mineria de Datos", "Vision por Computadora",
+                            "Procesamiento de Lenguaje Natural"],
         },
         1: {
             "nombre":      "Ciberseguridad Aplicada",
@@ -252,31 +256,29 @@ def especialidad(matricula):
         },
     }
 
-    info = especialidades_info[pred_idx]
-
-    # Top 3 materias más destacadas del alumno (para mostrar en la UI)
+    info       = especialidades_info[pred_idx]
     top_materias = sorted(materias_detalle, key=lambda x: x["calificacion"], reverse=True)[:5]
 
     return jsonify({
-        "estudiante":       {"nombre": est["nombre"], "apellido": est["apellido"]},
-        "especialidad":     info["nombre"],
-        "descripcion":      info["descripcion"],
-        "icono":            info["icono"],
-        "materias_esp":     info["materias"],
+        "estudiante":    {"nombre": est["nombre"], "apellido": est["apellido"]},
+        "especialidad":  info["nombre"],
+        "descripcion":   info["descripcion"],
+        "icono":         info["icono"],
+        "materias_esp":  info["materias"],
         "probabilidades": {
-            "Ciencia de Datos e IA":    round(float(probs[0]) * 100, 1),
-            "Ciberseguridad Aplicada":  round(float(probs[1]) * 100, 1),
-            "Perfil General":           round(float(probs[2]) * 100, 1),
+            "Ciencia de Datos e IA":   round(float(probs[0]) * 100, 1),
+            "Ciberseguridad Aplicada": round(float(probs[1]) * 100, 1),
+            "Perfil General":          round(float(probs[2]) * 100, 1),
         },
-        "top_materias":     top_materias,
-        "confianza":        round(float(probs[pred_idx]) * 100, 1),
+        "top_materias": top_materias,
+        "confianza":    round(float(probs[pred_idx]) * 100, 1),
     })
 
 
 # ── Healthcheck ──────────────────────────────────────────────────────────────
 @app.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "version": "1.0"})
+    return jsonify({"status": "ok", "version": "2.0", "db": "supabase"})
 
 
 if __name__ == "__main__":
