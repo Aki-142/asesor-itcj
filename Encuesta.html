@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encuesta de Especialidad - Asistente ITCJ</title>
+    <style>
+        :root {
+            --primary-color: #b30000; /* Rojo inspirado en la identidad institucional */
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+            --card-bg: #fff;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: var(--primary-color);
+        }
+        .form-group {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .question-text {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .option-label {
+            display: block;
+            margin: 8px 0;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .option-label:hover {
+            background: #f0f0f0;
+        }
+        input[type="radio"] {
+            margin-right: 10px;
+        }
+        .input-matricula {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #8c0000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Asistente ITCJ</h1>
+    <h2>Perfilamiento de Especialidad</h2>
+    <p>Responde estas 7 preguntas para que el modelo de Inteligencia Artificial pueda sugerirte la especialidad más afín a tus intereses.</p>
+
+    <form id="encuestaForm">
+        <label for="matricula" class="question-text">Ingresa tu Número de Control (Matrícula):</label>
+        <input type="text" id="matricula" class="input-matricula" required placeholder="Ej. 19110000">
+
+        <!-- Pregunta 1 -->
+        <div class="form-group">
+            <div class="question-text">1. Cuando te enfrentas a un problema técnico, ¿qué enfoque disfrutas más?</div>
+            <label class="option-label"><input type="radio" name="q1" value="0" required> A) Analizar grandes volúmenes de información para encontrar patrones o tendencias ocultas.</label>
+            <label class="option-label"><input type="radio" name="q1" value="100"> B) Inspeccionar la arquitectura del sistema para encontrar vulnerabilidades y parchearlas.</label>
+        </div>
+
+        <!-- Pregunta 2 -->
+        <div class="form-group">
+            <div class="question-text">2. Si tuvieras tiempo libre para un proyecto personal, ¿qué elegirías construir o analizar?</div>
+            <label class="option-label"><input type="radio" name="q2" value="0" required> A) Desarrollar un motor lógico (como un bot de ajedrez) optimizando sus algoritmos de toma de decisiones.</label>
+            <label class="option-label"><input type="radio" name="q2" value="100"> B) Desmontar y analizar el comportamiento de un ransomware reciente en un entorno controlado.</label>
+        </div>
+
+        <!-- Pregunta 3 -->
+        <div class="form-group">
+            <div class="question-text">3. ¿Con qué tipo de herramientas o conceptos prefieres trabajar en tu día a día?</div>
+            <label class="option-label"><input type="radio" name="q3" value="0" required> A) Modelos predictivos, limpieza de datos, y librerías estadísticas.</label>
+            <label class="option-label"><input type="radio" name="q3" value="100"> B) Configuración de redes, protocolos de comunicación, y herramientas de monitoreo.</label>
+        </div>
+
+        <!-- Pregunta 4 -->
+        <div class="form-group">
+            <div class="question-text">4. ¿Qué áreas de las matemáticas y la lógica te resultan más aplicables o interesantes?</div>
+            <label class="option-label"><input type="radio" name="q4" value="0" required> A) Probabilidad, estadística, cálculo y álgebra lineal.</label>
+            <label class="option-label"><input type="radio" name="q4" value="100"> B) Criptografía, matemáticas discretas y control de accesos lógicos.</label>
+        </div>
+
+        <!-- Pregunta 5 -->
+        <div class="form-group">
+            <div class="question-text">5. Si tuvieras que leer un artículo de investigación técnica hoy, ¿sobre qué tema sería?</div>
+            <label class="option-label"><input type="radio" name="q5" value="0" required> A) "Nuevas arquitecturas y optimización de redes neuronales."</label>
+            <label class="option-label"><input type="radio" name="q5" value="100"> B) "Técnicas recientes de pentesting y análisis forense digital."</label>
+        </div>
+
+        <!-- Pregunta 6 -->
+        <div class="form-group">
+            <div class="question-text">6. Tu enfoque principal al momento de programar suele ser:</div>
+            <label class="option-label"><input type="radio" name="q6" value="0" required> A) Mejorar el rendimiento, la precisión matemática y la eficiencia del código.</label>
+            <label class="option-label"><input type="radio" name="q6" value="100"> B) Asegurar que el código sea robusto frente a inyecciones, desbordamientos o fallos de seguridad.</label>
+        </div>
+
+        <!-- Pregunta 7 -->
+        <div class="form-group">
+            <div class="question-text">7. ¿Cuál es tu objetivo profesional a largo plazo?</div>
+            <label class="option-label"><input type="radio" name="q7" value="0" required> A) Crear sistemas autónomos que automaticen procesos complejos y aprendan por sí solos.</label>
+            <label class="option-label"><input type="radio" name="q7" value="100"> B) Proteger la integridad, disponibilidad y privacidad de la información crítica de una organización.</label>
+        </div>
+
+        <button type="submit">Continuar a Recomendación de Especialidad</button>
+    </form>
+</div>
+
+<script>
+    // 1. Validar si el usuario ya inició sesión previamente en tu sistema
+    const estudianteStr = sessionStorage.getItem("estudiante");
+    if (estudianteStr) {
+        const estudiante = JSON.parse(estudianteStr);
+        // Autocompletar la matrícula si ya está en sesión
+        const inputMatricula = document.getElementById('matricula');
+        if (inputMatricula) {
+            inputMatricula.value = estudiante.matricula;
+            inputMatricula.readOnly = true; // Evitar que la modifiquen si ya iniciaron sesión
+        }
+    }
+
+    // 2. Manejar el evento de envío del formulario
+    document.getElementById('encuestaForm').addEventListener('submit', function(event) {
+        event.preventDefault(); // Evita que la página se recargue
+        
+        const matricula = document.getElementById('matricula').value.trim();
+        if (!matricula) {
+            alert('Por favor ingresa tu matrícula.');
+            return;
+        }
+
+        // Recopilar las 7 respuestas
+        let respuestas = [];
+        for (let i = 1; i <= 7; i++) {
+            const opcionSeleccionada = document.querySelector(`input[name="q${i}"]:checked`);
+            if (opcionSeleccionada) {
+                respuestas.push(parseFloat(opcionSeleccionada.value));
+            } else {
+                // Validación por si el 'required' del HTML falla en algún navegador
+                alert(`Falta responder la pregunta ${i}`);
+                return;
+            }
+        }
+
+        // 3. Guardar las respuestas temporalmente en la sesión (para que Especialidad.html las lea)
+        sessionStorage.setItem("respuestas_encuesta", JSON.stringify(respuestas));
+        
+        // Si la matrícula no estaba en sesión (por ejemplo, si entraron directo), guardarla de forma temporal
+        if (!estudianteStr) {
+            sessionStorage.setItem("estudiante", JSON.stringify({ matricula: matricula }));
+        }
+        
+        // 4. Redirigir a la vista de Especialidad
+        window.location.href = "Especialidad.html";
+    });
+</script>
+
+</body>
+</html>

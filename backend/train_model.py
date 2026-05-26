@@ -22,15 +22,24 @@ LABEL_MAP = {"IA": 0, "Ciberseguridad": 1, "General": 2}
 LABEL_INV = {0: "Ciencia de Datos e IA", 1: "Ciberseguridad Aplicada", 2: "General"}
 
 
-def get_feature_vector(matricula, cur):
+def get_feature_vector(matricula: str, conn) -> list[float]:
+    c = conn.cursor()
     vector = []
+    
+    # 1. Obtener las calificaciones de las materias clave
     for clave in MATERIAS_CLAVE:
-        cur.execute(
-            "SELECT calificacion FROM calificaciones WHERE matricula=%s AND clave=%s",
-            (matricula, clave)
-        )
-        row = cur.fetchone()
-        vector.append(row["calificacion"] if row else 70.0)
+        row = c.execute("SELECT calificacion FROM calificaciones WHERE matricula=? AND clave=?", (matricula, clave)).fetchone()
+        vector.append(row[0] if row else 70.0)
+        
+    # 2. Obtener las 7 respuestas de la encuesta
+    encuesta = c.execute("SELECT p1, p2, p3, p4, p5, p6, p7 FROM estudiantes WHERE matricula=?", (matricula,)).fetchone()
+    
+    if encuesta and all(p is not None for p in encuesta):
+        vector.extend(list(encuesta))
+    else:
+        # Si un alumno viejo no tiene la encuesta, le ponemos 50 (neutral)
+        vector.extend([50.0] * 7)
+        
     return vector
 
 

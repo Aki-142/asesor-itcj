@@ -191,31 +191,37 @@ def materias_recomendadas(matricula):
     })
 
 
-# ── ENDPOINT: Recomendación de especialidad ─────────────────────────────────
-@app.route("/api/especialidad/<matricula>")
+# ── ENDPOINT: Recomendación de especialidad (IA) ────────────────────────────
+@app.route("/api/especialidad/<matricula>", methods=["GET", "POST"])
 def especialidad(matricula):
     conn = get_db()
-    cur  = conn.cursor()
 
-    cur.execute(
-        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=%s",
+    est = conn.execute(
+        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=?",
         (matricula,)
-    )
-    est = cur.fetchone()
+    ).fetchone()
+    
     if not est:
         conn.close()
         return jsonify({"error": "Estudiante no encontrado"}), 404
 
-    vector          = []
+    # 1. Recuperar respuestas de la encuesta (si vienen en el POST)
+    respuestas_encuesta = [50.0] * 7 # Valores neutrales por defecto
+    if request.method == "POST":
+        data = request.get_json()
+        if data and "encuesta" in data:
+            respuestas_encuesta = data["encuesta"]
+
+    # 2. Vector de características (Calificaciones del Kárdex)
+    vector = []
     materias_detalle = []
     for clave in MATERIAS_CLAVE:
-        cur.execute("""
-            SELECT c.calificacion, m.nombre, m.afinidad
-            FROM calificaciones c
-            JOIN materias m ON c.clave = m.clave
-            WHERE c.matricula=%s AND c.clave=%s
-        """, (matricula, clave))
-        row = cur.fetchone()
+        row = conn.execute(
+            "SELECT c.calificacion, m.nombre, m.afinidad FROM calificaciones c "
+            "JOIN materias m ON c.clave=m.clave "
+            "WHERE c.matricula=? AND c.clave=?",
+            (matricula, clave)
+        ).fetchone()
         cal = row["calificacion"] if row else 70.0
         vector.append(cal)
         if row:
@@ -227,52 +233,15 @@ def especialidad(matricula):
 
     conn.close()
 
-    X        = np.array(vector).reshape(1, -1)
+    # 3. Concatenar las calificaciones con la encuesta (Total: 23 features)
+    vector.extend(respuestas_encuesta)
+
+    # 4. Predicción del Modelo
+    X = np.array(vector).reshape(1, -1)
     X_scaled = SCALER.transform(X)
+
     probs    = MODEL.predict_proba(X_scaled)[0]
     pred_idx = int(np.argmax(probs))
-
-    especialidades_info = {
-        0: {
-            "nombre":      "Ciencia de Datos e IA",
-            "descripcion": "Enfocada en Machine Learning, Redes Neuronales y Ciencia de Datos.",
-            "icono":       "fa-brain",
-            "materias":    ["Machine Learning", "Redes Neuronales Artificiales",
-                            "Mineria de Datos", "Vision por Computadora",
-                            "Procesamiento de Lenguaje Natural"],
-        },
-        1: {
-            "nombre":      "Ciberseguridad Aplicada",
-            "descripcion": "Especializada en seguridad de redes, criptografía y hacking ético.",
-            "icono":       "fa-shield-halved",
-            "materias":    ["Seguridad en Redes", "Criptografia Aplicada", "Hacking Etico",
-                            "Forense Digital", "Seguridad en Aplicaciones Web"],
-        },
-        2: {
-            "nombre":      "Perfil General",
-            "descripcion": "Perfil equilibrado en todas las áreas de sistemas computacionales.",
-            "icono":       "fa-laptop-code",
-            "materias":    [],
-        },
-    }
-
-    info       = especialidades_info[pred_idx]
-    top_materias = sorted(materias_detalle, key=lambda x: x["calificacion"], reverse=True)[:5]
-
-    return jsonify({
-        "estudiante":    {"nombre": est["nombre"], "apellido": est["apellido"]},
-        "especialidad":  info["nombre"],
-        "descripcion":   info["descripcion"],
-        "icono":         info["icono"],
-        "materias_esp":  info["materias"],
-        "probabilidades": {
-            "Ciencia de Datos e IA":   round(float(probs[0]) * 100, 1),
-            "Ciberseguridad Aplicada": round(float(probs[1]) * 100, 1),
-            "Perfil General":          round(float(probs[2]) * 100, 1),
-        },
-        "top_materias": top_materias,
-        "confianza":    round(float(probs[pred_idx]) * 100, 1),
-    })
 
 
 # ── Healthcheck ──────────────────────────────────────────────────────────────

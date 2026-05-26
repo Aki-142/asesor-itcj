@@ -153,6 +153,26 @@ def gen_calificacion(afinidad: str, perfil: str) -> float:
     return round(min(100, max(60, cal)), 1)
 
 
+def gen_respuestas_encuesta(perfil: str) -> list[float]:
+    """
+    Genera 7 respuestas de la encuesta sesgadas según el perfil real del alumno.
+    IA (A) = 0.0
+    Ciberseguridad (B) = 100.0
+    """
+    respuestas = []
+    for _ in range(7):
+        if perfil == "IA":
+            # 80% de probabilidad de elegir A (0)
+            respuestas.append(float(random.choices([0, 100], weights=[80, 20])[0]))
+        elif perfil == "Ciberseguridad":
+            # 80% de probabilidad de elegir B (100)
+            respuestas.append(float(random.choices([0, 100], weights=[20, 80])[0]))
+        else:
+            # General: totalmente aleatorio
+            respuestas.append(float(random.choice([0, 100])))
+    return respuestas
+
+
 def create_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -185,7 +205,14 @@ def create_db():
             apellido    TEXT NOT NULL,
             pin_hash    TEXT NOT NULL,
             semestre_actual INTEGER NOT NULL,
-            perfil_real TEXT NOT NULL
+            perfil_real TEXT NOT NULL,
+            p1 REAL,
+            p2 REAL,
+            p3 REAL,
+            p4 REAL,
+            p5 REAL,
+            p6 REAL,
+            p7 REAL
         );
 
         CREATE TABLE calificaciones (
@@ -215,7 +242,7 @@ def create_db():
     estudiantes_data = []
     califs_data = []
 
-    # Alumno real (Noe) — perfil IA, semestre 4 completado
+    # Alumno real (Noe/Alejandro) — perfil IA, semestre 4 completado
     noe_califs = []
     materias_s1_s4 = [m for m in MATERIAS if m[2] <= 4]
     for m in materias_s1_s4:
@@ -231,9 +258,12 @@ def create_db():
         cal = round(random.uniform(60, 85), 1)
         noe_califs.append(("22111326", m[0], cal))
 
+    # Respuestas de la encuesta perfectas para IA (0.0 en todo)
+    noe_encuesta = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
     c.execute(
-        "INSERT INTO estudiantes VALUES (?,?,?,?,?,?)",
-        ("22111326", "Alejandro", "Ortiz", hash_pin("5545"), 5, "IA")
+        "INSERT INTO estudiantes VALUES (?,?,?,?,?,?, ?,?,?,?,?,?,?)",
+        ("22111326", "Alejandro", "Ortiz", hash_pin("5545"), 5, "IA", *noe_encuesta)
     )
     califs_data.extend(noe_califs)
 
@@ -247,10 +277,11 @@ def create_db():
         pin = str(random.randint(1000, 9999))
         semestre = random.randint(2, 8)
         perfil = random.choice(perfiles)
+        encuesta = gen_respuestas_encuesta(perfil)
 
         c.execute(
-            "INSERT INTO estudiantes VALUES (?,?,?,?,?,?)",
-            (mat, nombre, apellido, hash_pin(pin), semestre, perfil)
+            "INSERT INTO estudiantes VALUES (?,?,?,?,?,?, ?,?,?,?,?,?,?)",
+            (mat, nombre, apellido, hash_pin(pin), semestre, perfil, *encuesta)
         )
 
         # Calificaciones de semestres completados
@@ -274,6 +305,7 @@ def create_db():
     print(f"   Materias:     {len(MATERIAS)}")
     print(f"   Seriaciones:  {len(SERIACIONES)}")
     print(f"   Estudiantes:  26 (1 real + 25 ficticios)")
+    print(f"   Encuestas:    26 registros insertados (p1-p7)")
     print(f"   Calificaciones: {len(califs_data)}")
 
 
