@@ -195,34 +195,36 @@ def materias_recomendadas(matricula):
 @app.route("/api/especialidad/<matricula>", methods=["GET", "POST"])
 def especialidad(matricula):
     conn = get_db()
+    cur  = conn.cursor()
 
-    est = conn.execute(
-        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=?",
+    cur.execute(
+        "SELECT nombre, apellido, semestre_actual FROM estudiantes WHERE matricula=%s",
         (matricula,)
-    ).fetchone()
-    
+    )
+    est = cur.fetchone()
     if not est:
         conn.close()
         return jsonify({"error": "Estudiante no encontrado"}), 404
 
-    # 1. Recuperar respuestas de la encuesta (si vienen en el POST)
-    respuestas_encuesta = [50.0] * 7 # Valores neutrales por defecto
+    # 1. Respuestas de encuesta (POST) o neutrales (GET)
+    respuestas_encuesta = [50.0] * 7
     if request.method == "POST":
         data = request.get_json()
         if data and "encuesta" in data:
-            respuestas_encuesta = data["encuesta"]
+            respuestas_encuesta = [float(x) for x in data["encuesta"]]
 
-    # 2. Vector de características (Calificaciones del Kárdex)
+    # 2. Vector de calificaciones de materias clave
     vector = []
     materias_detalle = []
     for clave in MATERIAS_CLAVE:
-        row = conn.execute(
+        cur.execute(
             "SELECT c.calificacion, m.nombre, m.afinidad FROM calificaciones c "
-            "JOIN materias m ON c.clave=m.clave "
-            "WHERE c.matricula=? AND c.clave=?",
+            "JOIN materias m ON c.clave = m.clave "
+            "WHERE c.matricula=%s AND c.clave=%s",
             (matricula, clave)
-        ).fetchone()
-        cal = row["calificacion"] if row else 70.0
+        )
+        row = cur.fetchone()
+        cal = float(row["calificacion"]) if row else 70.0
         vector.append(cal)
         if row:
             materias_detalle.append({
@@ -233,15 +235,64 @@ def especialidad(matricula):
 
     conn.close()
 
-    # 3. Concatenar las calificaciones con la encuesta (Total: 23 features)
+    # 3. Concatenar calificaciones + encuesta (23 features en total)
     vector.extend(respuestas_encuesta)
 
-    # 4. Predicción del Modelo
-    X = np.array(vector).reshape(1, -1)
+    # 4. Predicción del modelo
+    X        = np.array(vector).reshape(1, -1)
     X_scaled = SCALER.transform(X)
-
     probs    = MODEL.predict_proba(X_scaled)[0]
     pred_idx = int(np.argmax(probs))
+
+    especialidad_pred = LABEL_INV[pred_idx]
+
+    # 5. Top 5 materias más fuertes del kardex
+    top_materias = sorted(materias_detalle, key=lambda m: m["calificacion"], reverse=True)[:5]
+
+    # 6. Metadatos de la especialidad para el frontend
+    ESP_META = {
+        "Ciencia de Datos e IA": {
+            "descripcion":  "Diseña sistemas inteligentes, modelos predictivos y soluciones basadas en datos.",
+            "icono":        "fa-brain",
+            "materias_esp": ["Machine Learning", "Redes Neuronales Artificiales",
+                             "Minería de Datos", "Visión por Computadora",
+                             "Procesamiento de Lenguaje Natural"],
+        },
+        "Ciberseguridad Aplicada": {
+            "descripcion":  "Protege infraestructuras críticas, analiza amenazas y aplica técnicas de hacking ético.",
+            "icono":        "fa-shield-halved",
+            "materias_esp": ["Seguridad en Redes", "Criptografía Aplicada",
+                             "Hacking Ético", "Forense Digital",
+                             "Seguridad en Aplicaciones Web"],
+        },
+        "General": {
+            "descripcion":  "Perfil versátil con sólidas bases en programación, redes y gestión de proyectos.",
+            "icono":        "fa-laptop-code",
+            "materias_esp": ["Ingeniería de Software", "Gestión de Proyectos de Software",
+                             "Administración de Redes", "Programación Web",
+                             "Programación Lógica y Funcional"],
+        },
+    }
+
+    meta = ESP_META.get(especialidad_pred, ESP_META["General"])
+
+    # 7. Probabilidades formateadas para el frontend
+    probabilidades = {
+        LABEL_INV[i]: round(float(p) * 100, 1)
+        for i, p in enumerate(probs)
+    }
+    confianza = round(float(probs[pred_idx]) * 100, 1)
+
+    return jsonify({
+        "estudiante":     {"nombre": est["nombre"], "apellido": est["apellido"]},
+        "especialidad":   especialidad_pred,
+        "confianza":      confianza,
+        "descripcion":    meta["descripcion"],
+        "icono":          meta["icono"],
+        "materias_esp":   meta["materias_esp"],
+        "top_materias":   top_materias,
+        "probabilidades": probabilidades,
+    })
 
 
 # ── Healthcheck ──────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
 DB_URL     = os.environ.get("DATABASE_URL")
-MODEL_PATH = "modelo_especialidad.pkl"
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelo_especialidad.pkl")
 
 MATERIAS_CLAVE = [
     "S1-02", "S2-02", "S2-05", "S2-06",
@@ -22,28 +22,37 @@ LABEL_MAP = {"IA": 0, "Ciberseguridad": 1, "General": 2}
 LABEL_INV = {0: "Ciencia de Datos e IA", 1: "Ciberseguridad Aplicada", 2: "General"}
 
 
-def get_feature_vector(matricula: str, conn) -> list[float]:
-    c = conn.cursor()
+def get_feature_vector(matricula: str, cur) -> list:
+    """Construye el vector de 23 features: 16 calificaciones + 7 encuesta."""
     vector = []
-    
-    # 1. Obtener las calificaciones de las materias clave
+
+    # 1. Calificaciones de las 16 materias clave
     for clave in MATERIAS_CLAVE:
-        row = c.execute("SELECT calificacion FROM calificaciones WHERE matricula=? AND clave=?", (matricula, clave)).fetchone()
-        vector.append(row[0] if row else 70.0)
-        
-    # 2. Obtener las 7 respuestas de la encuesta
-    encuesta = c.execute("SELECT p1, p2, p3, p4, p5, p6, p7 FROM estudiantes WHERE matricula=?", (matricula,)).fetchone()
-    
-    if encuesta and all(p is not None for p in encuesta):
-        vector.extend(list(encuesta))
+        cur.execute(
+            "SELECT calificacion FROM calificaciones WHERE matricula=%s AND clave=%s",
+            (matricula, clave)
+        )
+        row = cur.fetchone()
+        vector.append(float(row["calificacion"]) if row else 70.0)
+
+    # 2. Las 7 respuestas de la encuesta (p1-p7)
+    cur.execute(
+        "SELECT p1, p2, p3, p4, p5, p6, p7 FROM estudiantes WHERE matricula=%s",
+        (matricula,)
+    )
+    enc = cur.fetchone()
+    if enc and all(enc[f"p{i}"] is not None for i in range(1, 8)):
+        vector.extend([float(enc[f"p{i}"]) for i in range(1, 8)])
     else:
-        # Si un alumno viejo no tiene la encuesta, le ponemos 50 (neutral)
         vector.extend([50.0] * 7)
-        
+
     return vector
 
 
 def train_model():
+    if not DB_URL:
+        raise ValueError("La variable de entorno DATABASE_URL no está definida.")
+
     conn = psycopg2.connect(DB_URL)
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     cur  = conn.cursor()
@@ -71,7 +80,7 @@ def train_model():
         X, y, test_size=0.25, random_state=42, stratify=y
     )
 
-    scaler   = StandardScaler()
+    scaler    = StandardScaler()
     X_train_s = scaler.fit_transform(X_train)
     X_test_s  = scaler.transform(X_test)
 
@@ -84,11 +93,11 @@ def train_model():
     print(classification_report(y_test, y_pred, target_names=["IA", "Ciberseguridad", "General"]))
 
     bundle = {
-        "model":         model,
-        "scaler":        scaler,
+        "model":          model,
+        "scaler":         scaler,
         "materias_clave": MATERIAS_CLAVE,
-        "label_map":     LABEL_MAP,
-        "label_inv":     LABEL_INV,
+        "label_map":      LABEL_MAP,
+        "label_inv":      LABEL_INV,
     }
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(bundle, f)
