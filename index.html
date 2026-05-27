@@ -15,22 +15,41 @@
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--itcj-gray);
             margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+
+            /* Fondo con imagen */
+            background: url("https://sic.cultura.gob.mx/galeria_imagen/66c5fe8520d88fachada_enviada.jpg.jpg") no-repeat center center fixed;
+            background-size: cover;
+
+            /* Oscurecer un poco el fondo para contraste */
+            position: relative;
         }
+
+        /* Capa oscura encima del fondo */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.4); /* Ajusta la opacidad */
+            z-index: 0;
+        }
+
         .login-container {
             background-color: var(--itcj-white);
             padding: 2.5rem;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             width: 100%;
             max-width: 400px;
             text-align: center;
+            z-index: 1; /* Para que quede encima del overlay */
+            position: relative;
         }
+
         .logo-container img { width: 150px; height: auto; margin-bottom: 1.5rem; }
         h2 { color: var(--itcj-dark); margin-bottom: 0.5rem; font-weight: 600; }
         p  { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
@@ -78,7 +97,6 @@
             "Forjando el Futuro: Transformando Vidas"
         </div>
     </div>
-
     <script>
         // ── Cambiar esta URL cuando se despliegue en Render ─────────────────
         const API_BASE = "https://asesor-itcj.onrender.com/api";
